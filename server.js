@@ -74,7 +74,10 @@ const aw = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch
 
 // Simple in-memory rate limit for booking submissions.
 const hits = new Map();
+const VOICE_KEY = process.env.VOICE_KEY || '';
+const isVoice = (req) => !!VOICE_KEY && safeEqual(String(req.get('x-voice-key') || ''), VOICE_KEY);
 function rateLimit(req, res, next) {
+  if (isVoice(req)) return next(); // the phone agent books for many callers from one address
   const key = req.ip; const now = Date.now();
   const arr = (hits.get(key) || []).filter((t) => now - t < 60 * 60 * 1000);
   if (arr.length >= 10) return res.status(429).json({ error: 'Too many requests. Please call or WhatsApp us instead.' });
@@ -91,6 +94,18 @@ app.get('/api/slots', aw(async (req, res) => {
   const problem = dateProblem(String(date || ''));
   if (problem) return res.json({ closed: true, reason: problem, slots: [] });
   res.json({ closed: false, slots: await slotsFor(location, date) });
+}));
+
+// Free times for the phone agent (Retell sends a flat JSON body).
+app.post('/api/voice/availability', aw(async (req, res) => {
+  if (!isVoice(req)) return res.status(401).json({ error: 'Not allowed.' });
+  const location = String(req.body?.location || ''); const date = String(req.body?.date || '');
+  const today = nowInClinic().date;
+  if (!config.locations.some((l) => l.id === location)) return res.json({ today, error: 'Unknown clinic. Use f10 or gulberg.' });
+  const problem = dateProblem(date);
+  if (problem) return res.json({ today, date, location, available: false, reason: problem, available_times: [] });
+  const times = (await slotsFor(location, date)).filter((s) => s.available).map((s) => s.time);
+  res.json({ today, date, location, available: times.length > 0, available_times: times });
 }));
 
 const clean = (v, max) => String(v ?? '').trim().slice(0, max);
