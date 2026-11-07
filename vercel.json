@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm install",
+  "buildCommand": "node tools/copy-vendor.js",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.js": { "includeFiles": "{private/**,public/img/**}" }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+}

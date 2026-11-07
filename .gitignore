@@ -1,0 +1,7 @@
+node_modules/
+data/
+.env
+
+# local start script (contains the admin password)
+*.bat
+public/vendor/
